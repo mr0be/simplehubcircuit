@@ -1,10 +1,15 @@
 #include <Wire.h>
 #include "Adafruit_SHT31.h"
+#include "M5UnitQRCode.h"
 
+
+
+M5UnitQRCodeI2C qrcode;
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
 
 #define PA_HUB_ADDRESS 0x70
 #define PB_HUB_ADDRESS 0x61 
+#define I2C_AUTO_SCAN_MODE
 
 void setup() {
     Wire.begin(26, 32);
@@ -68,6 +73,31 @@ void controlRelay(uint8_t state){
     writeOnDigitalPbHub(0x51,state);
 }
 
+void scanQrCode(){
+    Wire.beginTransmission(PA_HUB_ADDRESS);
+    Wire.write(1 << 2);  // Channel 2 where QR Code Scanner is connected
+    Wire.endTransmission();
+    delay(100);
+
+  while (!qrcode.begin(&Wire, UNIT_QRCODE_ADDR, 26, 32, 100000U)) {
+        Serial.println("Unit QRCode I2C Init Fail");        
+        delay(1000);
+    }       
+
+  if (qrcode.getDecodeReadyStatus() == 1) {
+        uint8_t buffer[512] = {0};
+        uint16_t length     = qrcode.getDecodeLength();
+        Serial.printf("len:%d\r\n", length);
+        qrcode.getDecodeData(buffer, length);
+        Serial.printf("decode data:");
+        for (int i = 0; i < length; i++) {
+            Serial.printf("%c", buffer[i]);
+        }
+        Serial.println();
+    }
+
+}
+
 void loop() {
    if(readHallSensor()){
       controlRelay(HIGH);
@@ -76,5 +106,7 @@ void loop() {
    }
    delay(100); 
    readEnv_iiiSensor();
+   delay(100);
+   scanQrCode();
    delay(100); 
 }
